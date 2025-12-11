@@ -11,7 +11,7 @@
 	};
 
 	memory {
-		// fpga ddr2: 128MB*2
+		// fpga ddr4: 1024MB
 		reg = <0 0x40000000 0 0x10000000>;
 	};
 
