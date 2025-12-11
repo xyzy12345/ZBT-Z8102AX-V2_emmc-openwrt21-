@@ -116,7 +116,33 @@ jobs:
       run: |
         cd openwrt-build/openwrt
         echo "更新feeds..."
-        ./scripts/feeds update -a
+        
+        # 配置git以处理大仓库和网络问题
+        git config --global http.postBuffer 524288000
+        git config --global http.lowSpeedLimit 0
+        git config --global http.lowSpeedTime 999999
+        git config --global core.compression 0
+        
+        # 使用重试机制更新feeds
+        max_attempts=3
+        attempt=1
+        while [ $attempt -le $max_attempts ]; do
+          echo "尝试更新feeds (第 $attempt 次)..."
+          if ./scripts/feeds update -a; then
+            echo "feeds更新成功"
+            break
+          else
+            echo "feeds更新失败，等待10秒后重试..."
+            if [ $attempt -lt $max_attempts ]; then
+              sleep 10
+              attempt=$((attempt + 1))
+            else
+              echo "feeds更新失败，已达到最大重试次数"
+              exit 1
+            fi
+          fi
+        done
+        
         ./scripts/feeds install -a
         echo "feeds更新完成"
 
