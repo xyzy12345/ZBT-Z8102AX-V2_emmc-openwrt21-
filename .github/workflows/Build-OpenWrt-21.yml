@@ -106,17 +106,22 @@ jobs:
         
         # 创建目标目录（如果不存在）
         mkdir -p target/linux/$TARGET/$SUBTARGET/dts/
+        mkdir -p target/linux/$TARGET/image/
         
         # 复制配置文件
         cp ../../${{ env.CONFIG_PATH }} .config
-        cp ../../${{ env.DEVICE_MK_PATH }} target/linux/$TARGET/$SUBTARGET/
         cp ../../${{ env.DTS_PATH }} target/linux/$TARGET/$SUBTARGET/dts/
+        
+        # 将设备定义追加到image Makefile（正确的位置）
+        echo "将设备定义追加到 target/linux/$TARGET/image/$SUBTARGET.mk"
+        cat ../../${{ env.DEVICE_MK_PATH }} >> target/linux/$TARGET/image/$SUBTARGET.mk
         
         # 验证文件已复制
         echo "配置文件状态:"
         ls -la .config
-        ls -la target/linux/$TARGET/$SUBTARGET/mt7981.mk
         ls -la target/linux/$TARGET/$SUBTARGET/dts/ZBT-Z8102AX-eMMC.dts
+        echo "检查设备定义是否已添加到image Makefile:"
+        tail -30 target/linux/$TARGET/image/$SUBTARGET.mk
 
     - name: Update feeds
       run: |
@@ -159,6 +164,9 @@ jobs:
         make defconfig
         # 显示配置差异
         ./scripts/diffconfig.sh
+        # 验证设备配置
+        echo "验证目标设备配置:"
+        grep "CONFIG_TARGET.*mt7981.*DEVICE" .config || echo "未找到设备配置"
         echo "配置完成"
 
     - name: Download packages
@@ -188,9 +196,15 @@ jobs:
         if make -j${make_jobs} V=s 2>&1 | tee build.log; then
           echo "编译成功！"
           
+          # 检查bin目录结构
+          echo "检查bin目录结构:"
+          ls -la bin/targets/ 2>/dev/null || echo "bin/targets/ 目录不存在"
+          ls -la bin/targets/$TARGET/ 2>/dev/null || echo "bin/targets/$TARGET/ 目录不存在"
+          ls -la bin/targets/$TARGET/$SUBTARGET/ 2>/dev/null || echo "bin/targets/$TARGET/$SUBTARGET/ 目录不存在"
+          
           # 检查生成的固件
           echo "生成的固件文件:"
-          find bin/targets/$TARGET/$SUBTARGET/ -name "*.bin" -o -name "*.img" | head -20
+          find bin/targets/$TARGET/$SUBTARGET/ -name "*.bin" -o -name "*.img" 2>/dev/null | head -20 || echo "未找到固件文件"
         else
           echo "编译失败，请查看build.log"
           # 显示错误信息
@@ -201,10 +215,18 @@ jobs:
     - name: List build artifacts
       run: |
         cd openwrt-build/openwrt
-        echo "构建产物列表:"
-        ls -la bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/
-        echo "固件文件:"
-        find bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/ -name "*.bin" -o -name "*.img" | xargs ls -la
+        if [ -d "bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/" ]; then
+          echo "构建产物列表:"
+          ls -la bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/
+          echo "固件文件:"
+          find bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/ -name "*.bin" -o -name "*.img" | xargs ls -la 2>/dev/null || echo "未找到.bin或.img文件"
+        else
+          echo "错误: bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/ 目录不存在"
+          echo "这表明设备定义未被正确加载或编译"
+          echo "检查可用的目标目录:"
+          find bin/targets/ -type d 2>/dev/null || echo "bin/targets/ 目录为空"
+          exit 1
+        fi
 
     - name: Archive firmware
       uses: actions/upload-artifact@v4

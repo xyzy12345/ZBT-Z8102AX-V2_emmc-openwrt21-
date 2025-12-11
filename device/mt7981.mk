@@ -1,12 +1,11 @@
 # Device definition for ZBT Z8102AX-V2 eMMC
-# This content should be added to target/linux/mediatek/image/mt7981.mk
+# This content will be appended to target/linux/mediatek/image/mt7981.mk
 
 define Device/mt7981-emmc-rfb-z8102ax
   DEVICE_VENDOR := ZBT
   DEVICE_MODEL := Z8102AX-V2
   DEVICE_VARIANT := eMMC
   DEVICE_DTS := ZBT-Z8102AX-eMMC
-  DEVICE_DTS_DIR := ../dts
   DEVICE_PACKAGES := kmod-usb3 kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware \
 		     kmod-mmc kmod-sdhci kmod-sdhci-mt7620
   SUPPORTED_DEVICES := zbtlink,z8102ax-emmc mediatek,mt7981-emmc-rfb
