@@ -1,5 +1,8 @@
 /dts-v1/;
 #include "mt7981.dtsi"
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+
 / {
 
         model = "ZBT-Z8102AX-eMMC";
@@ -209,8 +212,6 @@
 			compatible = "ethernet-phy-id03a2.9461";
 			reg = <0>;
 			phy-mode = "gmii";
-			nvmem-cells = <&phy_calibration>;
-			nvmem-cell-names = "phy-cal-data";
 		};
 
 		switch@0 {
