@@ -14,6 +14,8 @@
 │   └── build-openwrt.yml       # GitHub Actions 构建工作流
 ├── config/
 │   └── ZBT-Z8102AX-eMMC.config # OpenWrt 配置文件
+├── device/
+│   └── mt7981.mk               # 设备定义文件
 ├── dts/
 │   └── ZBT-Z8102AX-eMMC.dts    # 设备树文件
 └── README.md
@@ -25,7 +27,7 @@
 
 1. **触发构建**：
    - 推送修改到 `main` 分支会自动触发构建
-   - 修改 `config/` 或 `dts/` 目录中的文件也会触发构建
+   - 修改 `config/`、`dts/` 或 `device/` 目录中的文件也会触发构建
    - 在 Actions 页面手动触发工作流
 
 2. **查看进度**：
@@ -58,6 +60,7 @@ cd openwrt
 # 4. 复制配置文件
 cp ../config/ZBT-Z8102AX-eMMC.config .config
 cp ../dts/ZBT-Z8102AX-eMMC.dts target/linux/mediatek/dts/
+cat ../device/mt7981.mk >> target/linux/mediatek/image/mt7981.mk
 
 # 5. 配置
 make defconfig
@@ -91,6 +94,7 @@ make -j$(nproc) V=s
 ## 配置说明
 
 - **DTS 文件**：`dts/ZBT-Z8102AX-eMMC.dts` - 包含设备硬件定义
+- **Device 文件**：`device/mt7981.mk` - 设备定义，用于将设备添加到 OpenWrt 构建系统
 - **Config 文件**：`config/ZBT-Z8102AX-eMMC.config` - OpenWrt 编译配置
 
 ## 硬件规格

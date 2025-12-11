@@ -31,6 +31,7 @@
 
 3. **配置加载**：
    - 复制 DTS 文件到 `target/linux/mediatek/dts/`
+   - 添加设备定义到 `target/linux/mediatek/image/mt7981.mk`
    - 加载 `.config` 配置文件
    - 执行 `make defconfig`
 
@@ -76,6 +77,16 @@
 - **网络**：5 个千兆以太网口
 - **无线**：双频 WiFi (2.4GHz + 5GHz)
 - **USB**：USB 3.0 支持
+
+### Device 文件 (device/mt7981.mk)
+
+设备定义文件，用于将设备添加到 OpenWrt 构建系统：
+
+- **设备标识**：`mt7981-emmc-rfb-z8102ax`
+- **设备信息**：厂商 (ZBT)、型号 (Z8102AX-V2)、变体 (eMMC)
+- **设备包**：包含必需的驱动和固件
+- **镜像类型**：sysupgrade.bin、factory.bin
+- **分区大小**：内核 16MB、镜像 64MB
 
 ### Config 文件 (config/ZBT-Z8102AX-eMMC.config)
 

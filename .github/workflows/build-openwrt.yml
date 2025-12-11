@@ -8,6 +8,7 @@ on:
     paths:
       - 'config/**'
       - 'dts/**'
+      - 'device/**'
       - '.github/workflows/build-openwrt.yml'
   pull_request:
     branches:
@@ -25,6 +26,7 @@ env:
   REPO_BRANCH: openwrt-21.02
   CONFIG_FILE: config/ZBT-Z8102AX-eMMC.config
   DTS_FILE: dts/ZBT-Z8102AX-eMMC.dts
+  DEVICE_FILE: device/mt7981.mk
   DEVICE_NAME: ZBT-Z8102AX-eMMC
   TZ: Asia/Shanghai
 
@@ -69,6 +71,11 @@ jobs:
         mkdir -p openwrt/target/linux/mediatek/dts
         cp $DTS_FILE openwrt/target/linux/mediatek/dts/
         echo "DTS file copied to target directory"
+        
+        # Add device definition to target Makefile
+        echo "Adding device definition to mt7981.mk..."
+        cat device/mt7981.mk >> openwrt/target/linux/mediatek/image/mt7981.mk
+        echo "Device definition added"
         
         # Copy config file
         cp $CONFIG_FILE openwrt/.config
