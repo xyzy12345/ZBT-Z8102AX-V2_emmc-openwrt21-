@@ -6,7 +6,7 @@ on:
     paths:
       - 'config/ZBT-Z8102AX-eMMC24.config'
       - 'dts/ZBT-Z8102AX-eMMC24.dts'
-      - 'device/mt7981_24.mk'
+      - 'device/filogic.mk'
       - '.github/workflows/build-openwrt24.yml'
   pull_request:
     branches: [ main, master ]
@@ -37,7 +37,7 @@ env:
   # 文件路径
   CONFIG_PATH: config/ZBT-Z8102AX-eMMC24.config
   DTS_PATH: dts/ZBT-Z8102AX-eMMC24.dts
-  DEVICE_MK_PATH: device/mt7981_24.mk
+  DEVICE_MK_PATH: device/filogic.mk
 
 jobs:
   build:
@@ -94,8 +94,8 @@ jobs:
         ls -la ${{ env.CONFIG_PATH }} || echo "配置文件不存在"
         echo "DTS文件路径: ${{ env.DTS_PATH }}"
         ls -la ${{ env.DTS_PATH }} || echo "DTS文件不存在"
-        echo "设备MK文件路径: ${{ env.DEVICE_MK_PATH }}"
-        ls -la ${{ env.DEVICE_MK_PATH }} || echo "设备MK文件不存在"
+        echo "Filogic MK文件路径: ${{ env.DEVICE_MK_PATH }}"
+        ls -la ${{ env.DEVICE_MK_PATH }} || echo "Filogic MK文件不存在"
         
         # 验证所有必需文件都存在
         if [ ! -f "${{ env.CONFIG_PATH }}" ] || [ ! -f "${{ env.DTS_PATH }}" ] || [ ! -f "${{ env.DEVICE_MK_PATH }}" ]; then
@@ -116,8 +116,8 @@ jobs:
         cp ../../${{ env.CONFIG_PATH }} .config
         cp ../../${{ env.DTS_PATH }} target/linux/$TARGET/dts/
         
-        # 将设备定义追加到image Makefile（filogic.mk for 24.10）
-        echo "将设备定义追加到 target/linux/$TARGET/image/filogic.mk"
+        # 将设备定义插入到image Makefile（filogic.mk for 24.10）
+        echo "将设备定义插入到 target/linux/$TARGET/image/filogic.mk"
         cat ../../${{ env.DEVICE_MK_PATH }} >> target/linux/$TARGET/image/filogic.mk
         
         # 验证文件已复制
@@ -262,7 +262,7 @@ jobs:
         echo "OpenWrt版本: ${{ env.OPENWRT_VERSION }}"
         echo "配置文件: ${{ env.CONFIG_PATH }}"
         echo "DTS文件: ${{ env.DTS_PATH }}"
-        echo "设备MK文件: ${{ env.DEVICE_MK_PATH }}"
+        echo "Filogic MK文件: ${{ env.DEVICE_MK_PATH }}"
         echo "工作流运行号: ${{ github.run_number }}"
         echo "触发方式: ${{ github.event_name }}"
         echo "固件文件位于 Artifacts 中"
