@@ -21,6 +21,12 @@ on:
         required: false
         default: 'false'
 
+# Prevent multiple workflow runs from running simultaneously
+# Cancel in-progress runs when a new commit is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   REPO_URL: https://git.openwrt.org/openwrt/openwrt.git
   REPO_BRANCH: openwrt-21.02
