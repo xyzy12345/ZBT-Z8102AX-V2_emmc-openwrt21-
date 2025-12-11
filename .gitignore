@@ -1,0 +1,28 @@
+# OpenWrt build artifacts
+openwrt/
+bin/
+build_dir/
+staging_dir/
+tmp/
+dl/
+feeds/
+logs/
+
+# Compiled files
+*.o
+*.ko
+*.bin
+*.img
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+.DS_Store
+
+# Temporary files
+*.tmp
+*.bak
+*.log
