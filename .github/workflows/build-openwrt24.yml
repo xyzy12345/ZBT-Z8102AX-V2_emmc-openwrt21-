@@ -1,0 +1,269 @@
+name: Build OpenWrt 24.10.4 for ZBT-Z8102AX-eMMC
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'config/ZBT-Z8102AX-eMMC24.config'
+      - 'dts/ZBT-Z8102AX-eMMC24.dts'
+      - 'device/filogic.mk'
+      - '.github/workflows/build-openwrt24.yml'
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    # 每天凌晨3点自动构建（UTC时间）
+    - cron: '0 19 * * *'
+  workflow_dispatch:  # 手动触发
+
+# Prevent multiple workflow runs from running simultaneously
+# Cancel in-progress runs when a new commit is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  actions: read
+
+env:
+  # OpenWrt 版本设置
+  OPENWRT_VERSION: 24.10.4
+  OPENWRT_BRANCH: openwrt-24.10
+  # 设备配置
+  DEVICE_MODEL: ZBT-Z8102AX-eMMC-24
+  TARGET: mediatek
+  SUBTARGET: filogic
+  PROFILE: zbt_z8102ax-emmc
+  # 文件路径
+  CONFIG_PATH: config/ZBT-Z8102AX-eMMC24.config
+  DTS_PATH: dts/ZBT-Z8102AX-eMMC24.dts
+  DEVICE_MK_PATH: device/filogic.mk
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Setup build environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          clang \
+          flex \
+          bison \
+          g++ \
+          gawk \
+          gcc-multilib \
+          gettext \
+          git \
+          libncurses5-dev \
+          libssl-dev \
+          python3 \
+          python3-distutils \
+          rsync \
+          unzip \
+          zlib1g-dev \
+          file \
+          wget \
+          quilt
+          
+        # 设置工作目录
+        mkdir -p openwrt-build
+        cd openwrt-build
+
+    - name: Clone OpenWrt 24.10 source
+      run: |
+        cd openwrt-build
+        git clone https://github.com/openwrt/openwrt.git --depth=1 -b $OPENWRT_BRANCH
+        cd openwrt
+        echo "当前目录: $(pwd)"
+        echo "OpenWrt版本:"
+        cat include/version.mk 2>/dev/null || echo "版本信息不可用"
+
+    - name: Check configuration files exist
+      run: |
+        echo "检查配置文件是否存在..."
+        echo "配置文件路径: ${{ env.CONFIG_PATH }}"
+        ls -la ${{ env.CONFIG_PATH }} || echo "配置文件不存在"
+        echo "DTS文件路径: ${{ env.DTS_PATH }}"
+        ls -la ${{ env.DTS_PATH }} || echo "DTS文件不存在"
+        echo "Filogic MK文件路径: ${{ env.DEVICE_MK_PATH }}"
+        ls -la ${{ env.DEVICE_MK_PATH }} || echo "Filogic MK文件不存在"
+        
+        # 验证所有必需文件都存在
+        if [ ! -f "${{ env.CONFIG_PATH }}" ] || [ ! -f "${{ env.DTS_PATH }}" ] || [ ! -f "${{ env.DEVICE_MK_PATH }}" ]; then
+          echo "错误: 缺少必需的配置文件"
+          exit 1
+        fi
+
+    - name: Copy device configuration files
+      run: |
+        cd openwrt-build/openwrt
+        echo "复制配置文件到OpenWrt目录..."
+        
+        # 创建目标目录（如果不存在）
+        mkdir -p target/linux/$TARGET/dts/
+        mkdir -p target/linux/$TARGET/image/
+        
+        # 复制配置文件
+        cp ../../${{ env.CONFIG_PATH }} .config
+        cp ../../${{ env.DTS_PATH }} target/linux/$TARGET/dts/
+        
+        # 将设备定义插入到image Makefile（filogic.mk for 24.10）
+        echo "将设备定义插入到 target/linux/$TARGET/image/filogic.mk"
+        cat ../../${{ env.DEVICE_MK_PATH }} >> target/linux/$TARGET/image/filogic.mk
+        
+        # 验证文件已复制
+        echo "配置文件状态:"
+        ls -la .config
+        ls -la target/linux/$TARGET/dts/ZBT-Z8102AX-eMMC24.dts
+        echo "检查设备定义是否已添加到image Makefile:"
+        tail -30 target/linux/$TARGET/image/filogic.mk
+
+    - name: Update feeds
+      run: |
+        cd openwrt-build/openwrt
+        echo "更新feeds..."
+        
+        # 配置git以处理大仓库和网络问题
+        git config --global http.postBuffer 524288000
+        git config --global http.lowSpeedLimit 0
+        git config --global http.lowSpeedTime 999999
+        git config --global core.compression 0
+        
+        # 使用重试机制更新feeds
+        max_attempts=3
+        attempt=1
+        while [ $attempt -le $max_attempts ]; do
+          echo "尝试更新feeds (第 $attempt 次)..."
+          if ./scripts/feeds update -a; then
+            echo "feeds更新成功"
+            break
+          else
+            echo "feeds更新失败，等待10秒后重试..."
+            if [ $attempt -lt $max_attempts ]; then
+              sleep 10
+              attempt=$((attempt + 1))
+            else
+              echo "feeds更新失败，已达到最大重试次数"
+              exit 1
+            fi
+          fi
+        done
+        
+        ./scripts/feeds install -a
+        echo "feeds更新完成"
+
+    - name: Configure build
+      run: |
+        cd openwrt-build/openwrt
+        echo "配置编译..."
+        make defconfig
+        # 显示配置差异
+        ./scripts/diffconfig.sh
+        # 验证设备配置
+        echo "验证目标设备配置:"
+        grep "CONFIG_TARGET.*filogic.*DEVICE\|CONFIG_TARGET.*mediatek.*DEVICE" .config || echo "未找到设备配置"
+        echo "配置完成"
+
+    - name: Download packages
+      run: |
+        cd openwrt-build/openwrt
+        echo "下载软件包..."
+        make download -j$(nproc)
+        # 验证所有包已下载
+        make -j$(nproc) -k download 2>&1 | tee download.log
+        if grep -q "FAILED" download.log; then
+          echo "有包下载失败，请检查网络或配置"
+          # 显示失败的包
+          grep "FAILED" download.log
+          exit 1
+        fi
+        echo "包下载完成"
+
+    - name: Build firmware
+      run: |
+        cd openwrt-build/openwrt
+        echo "开始编译固件..."
+        # 使用多线程编译，但留出一些CPU资源给系统
+        let make_jobs=$(nproc)+1
+        echo "使用 $make_jobs 个线程进行编译"
+        
+        # 编译固件
+        if make -j${make_jobs} V=s 2>&1 | tee build.log; then
+          echo "编译成功！"
+          
+          # 检查bin目录结构
+          echo "检查bin目录结构:"
+          ls -la bin/targets/ 2>/dev/null || echo "bin/targets/ 目录不存在"
+          ls -la bin/targets/$TARGET/ 2>/dev/null || echo "bin/targets/$TARGET/ 目录不存在"
+          ls -la bin/targets/$TARGET/$SUBTARGET/ 2>/dev/null || echo "bin/targets/$TARGET/$SUBTARGET/ 目录不存在"
+          
+          # 检查生成的固件
+          echo "生成的固件文件:"
+          find bin/targets/$TARGET/$SUBTARGET/ -name "*.bin" -o -name "*.img" 2>/dev/null | head -20 || echo "未找到固件文件"
+        else
+          echo "编译失败，请查看build.log"
+          # 显示错误信息
+          tail -100 build.log | grep -i error || tail -50 build.log
+          exit 1
+        fi
+
+    - name: List build artifacts
+      run: |
+        cd openwrt-build/openwrt
+        if [ -d "bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/" ]; then
+          echo "构建产物列表:"
+          ls -la bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/
+          echo "固件文件:"
+          find bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/ -name "*.bin" -o -name "*.img" | xargs ls -la 2>/dev/null || echo "未找到.bin或.img文件"
+        else
+          echo "错误: bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/ 目录不存在"
+          echo "这表明设备定义未被正确加载或编译"
+          echo "检查可用的目标目录:"
+          find bin/targets/ -type d 2>/dev/null || echo "bin/targets/ 目录为空"
+          exit 1
+        fi
+
+    - name: Archive firmware
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.DEVICE_MODEL }}-firmware-${{ github.run_number }}
+        path: |
+          openwrt-build/openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/*.bin
+          openwrt-build/openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/*.img
+          openwrt-build/openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/*.manifest
+          openwrt-build/openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/config.buildinfo
+        retention-days: 30
+
+    - name: Upload to release (可选)
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          openwrt-build/openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/*.bin
+          openwrt-build/openwrt/bin/targets/${{ env.TARGET }}/${{ env.SUBTARGET }}/*.img
+        draft: false
+        prerelease: false
+
+    - name: Build summary
+      if: always()
+      run: |
+        echo "========== 构建总结 =========="
+        echo "设备: ${{ env.DEVICE_MODEL }}"
+        echo "目标平台: ${{ env.TARGET }}/${{ env.SUBTARGET }}"
+        echo "OpenWrt版本: ${{ env.OPENWRT_VERSION }}"
+        echo "配置文件: ${{ env.CONFIG_PATH }}"
+        echo "DTS文件: ${{ env.DTS_PATH }}"
+        echo "Filogic MK文件: ${{ env.DEVICE_MK_PATH }}"
+        echo "工作流运行号: ${{ github.run_number }}"
+        echo "触发方式: ${{ github.event_name }}"
+        echo "固件文件位于 Artifacts 中"
+        echo "============================="
