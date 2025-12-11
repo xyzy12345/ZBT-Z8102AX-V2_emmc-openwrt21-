@@ -1,21 +1,30 @@
 # Device definition for ZBT Z8102AX-V2 eMMC (Version 24.10.4)
-# This content will be appended to target/linux/mediatek/image/mt7981.mk
-# eMMC devices use block device format, not UBI/NAND format
+# This content will be appended to target/linux/mediatek/image/filogic.mk
+# eMMC devices use block device format with mt798x-gpt partitioning
 
-define Device/mt7981-emmc-rfb-z8102ax-24
+define Device/zbt_z8102ax-emmc
   DEVICE_VENDOR := ZBT
   DEVICE_MODEL := Z8102AX-V2
-  DEVICE_VARIANT := eMMC-24
+  DEVICE_VARIANT := eMMC
   DEVICE_DTS := ZBT-Z8102AX-eMMC24
+  DEVICE_DTS_DIR := ../dts
+  DEVICE_DTS_LOADADDR := 0x43f00000
   DEVICE_PACKAGES := kmod-usb3 kmod-mt7915e kmod-mt7981-firmware mt7981-wo-firmware \
-		     kmod-mmc kmod-sdhci kmod-sdhci-mt7620
+		     e2fsprogs f2fsck mkf2fs
   SUPPORTED_DEVICES := zbtlink,z8102ax-emmc mediatek,mt7981-emmc-rfb
-  IMAGE_SIZE := 65536k
-  KERNEL_SIZE := 16384k
-  KERNEL := kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb
-  KERNEL_INITRAMFS := kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd
-  IMAGES := sysupgrade.bin factory.bin
-  IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata
-  IMAGE/factory.bin := append-kernel | pad-to $$(KERNEL_SIZE) | append-rootfs | pad-rootfs | check-size
+  KERNEL_LOADADDR := 0x44000000
+  KERNEL := kernel-bin | gzip
+  KERNEL_INITRAMFS := kernel-bin | lzma | \
+	fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb with-initrd | pad-to 64k
+  KERNEL_INITRAMFS_SUFFIX := -recovery.itb
+  IMAGES := sysupgrade.itb
+  IMAGE_SIZE := $$(shell expr 64 + $$(CONFIG_TARGET_ROOTFS_PARTSIZE))m
+  IMAGE/sysupgrade.itb := append-kernel | \
+	fit gzip $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb external-static-with-rootfs | \
+	pad-rootfs | append-metadata
+  ARTIFACTS := emmc-gpt.bin emmc-preloader.bin emmc-bl31-uboot.fip
+  ARTIFACT/emmc-gpt.bin := mt798x-gpt emmc
+  ARTIFACT/emmc-preloader.bin := mt7981-bl2 emmc-ddr4
+  ARTIFACT/emmc-bl31-uboot.fip := mt7981-bl31-uboot zbt_z8102ax-emmc
 endef
-TARGET_DEVICES += mt7981-emmc-rfb-z8102ax-24
+TARGET_DEVICES += zbt_z8102ax-emmc
